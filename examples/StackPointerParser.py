@@ -28,6 +28,16 @@ from neuronlp2.tasks import parser
 uid = uuid.uuid4().get_hex()[:6]
 
 
+def update_optim_state(state_dict, update_dict):
+    param_groups = state_dict['params']
+    for group in param_groups:
+        for k, v in update_dict.items():
+            assert k in group, 'unknown param: %s' % k
+            group[k] = v
+    return state_dict
+
+
+
 def main():
     args_parser = argparse.ArgumentParser(description='Tuning with stack pointer parser')
     args_parser.add_argument('--mode', choices=['RNN', 'LSTM', 'GRU', 'FastLSTM'], help='architecture of rnn', required=True)
@@ -88,7 +98,7 @@ def main():
     opt = args.opt
     momentum = 0.9
     betas = (0.9, 0.9)
-    eps = 1e-4
+    epsilon = 1e-8
     decay_rate = args.decay_rate
     clip = args.clip
     gamma = args.gamma
@@ -120,6 +130,8 @@ def main():
 
     alphabet_path = os.path.join(model_path, 'alphabets/')
     model_name = os.path.join(model_path, model_name)
+    param_name = model_name + '.' + 'params'
+    opt_name = model_name + '.' + opt
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = conllx_stacked_data.create_alphabets(alphabet_path, train_path,
                                                                                                      data_paths=[dev_path, test_path], max_vocabulary_size=50000, embedd_dict=word_dict)
 
@@ -196,6 +208,16 @@ def main():
     pred_writer = CoNLLXWriter(word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
     gold_writer = CoNLLXWriter(word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
 
+    def get_opt_info(opt):
+        opt_info = 'opt: %s, ' % opt
+        if opt == 'adam':
+            opt_info += 'betas=%s, eps=%.1e' % (betas, eps)
+        elif opt == 'sgd':
+            opt_info += 'momentum=%.2f' % momentum
+        elif opt == 'adamax':
+            opt_info += 'betas=%s, eps=%.1e' % (betas, eps)
+        return opt_info
+
     def generate_optimizer(opt, lr, params):
         if opt == 'adam':
             return Adam(params, lr=lr, betas=betas, weight_decay=gamma, eps=eps)
@@ -207,14 +229,9 @@ def main():
             raise ValueError('Unknown optimization algorithm: %s' % opt)
 
     lr = learning_rate
+    eps = epsilon
     optim = generate_optimizer(opt, lr, network.parameters())
-    opt_info = 'opt: %s, ' % opt
-    if opt == 'adam':
-        opt_info += 'betas=%s, eps=%.1e' % (betas, eps)
-    elif opt == 'sgd':
-        opt_info += 'momentum=%.2f' % momentum
-    elif opt == 'adamax':
-        opt_info += 'betas=%s, eps=%.1e' % (betas, eps)
+    opt_info = get_opt_info(opt)
 
     logger.info("Embedding dim: word=%d, char=%d, pos=%d" % (word_dim, char_dim, pos_dim))
     logger.info("Network: %s, num_layer=%d, hidden=%d, filter=%d, arc_space=%d, type_space=%d" % (mode, num_layers, hidden_size, num_filters, arc_space, type_space))
@@ -255,7 +272,7 @@ def main():
     decay = 0
     max_decay = 10
     for epoch in range(1, num_epochs + 1):
-        print('Epoch %d (%s, optim: %s, learning rate=%.6f, decay rate=%.2f (schedule=%d, patient=%d, decay=%d)): ' % (epoch, mode, opt, lr, decay_rate, schedule, patient, decay))
+        print('Epoch %d (%s, optim: %s, learning rate=%.6f, eps=%.1e, decay rate=%.2f (schedule=%d, patient=%d, decay=%d)): ' % (epoch, mode, opt, lr, eps, decay_rate, schedule, patient, decay))
         train_err_arc_leaf = 0.
         train_err_arc_non_leaf = 0.
         train_err_type_leaf = 0.
@@ -419,6 +436,8 @@ def main():
 
             best_epoch = epoch
             patient = 0
+            torch.save(network.state_dict(), param_name)
+            torch.save(optim.state_dict(), opt_name)
             torch.save(network, model_name)
 
             pred_filename = 'tmp/%spred_test%d' % (str(uid), epoch)
@@ -480,12 +499,29 @@ def main():
             pred_writer.close()
             gold_writer.close()
         else:
-            if patient < schedule:
+            if dev_ucorr_nopunc < dev_ucorrect_nopunc - 10:
+                # crashed due to adam, increase epsilon
+                network.load_state_dict(torch.load(param_name))
+                opt_state = torch.load(opt_name)
+                eps = eps * 10
+                optim.load_state_dict(update_optim_state(opt_state, dict(eps=eps)))
+                logger.info('Optimizer crashed. Increase eps and roll model back to epoch %d' % best_epoch)
+                logger.info(get_opt_info(opt))
+                patient = 0
+            elif patient < schedule:
                 patient += 1
             else:
-                network = torch.load(model_name)
+                network.load_state_dict(torch.load(param_name))
                 lr = lr * decay_rate
-                optim = generate_optimizer(opt, lr, network.parameters())
+                eps = epsilon
+
+                # update optimizer
+                opt_state = torch.load(opt_name)
+                optim.load_state_dict(update_optim_state(opt_state, dict(eps=eps, lr=lr)))
+                # optim = generate_optimizer(opt, lr, network.parameters())
+
+                logger.info('Decay learning rate and roll model back to epoch %d' % best_epoch)
+                logger.info(get_opt_info(opt))
                 patient = 0
                 decay += 1
                 if decay % 3 == 0:
