@@ -29,7 +29,7 @@ uid = uuid.uuid4().get_hex()[:6]
 
 
 def update_optim_state(state_dict, update_dict):
-    param_groups = state_dict['params']
+    param_groups = state_dict['param_groups']
     for group in param_groups:
         for k, v in update_dict.items():
             assert k in group, 'unknown param: %s' % k
@@ -499,7 +499,7 @@ def main():
             pred_writer.close()
             gold_writer.close()
         else:
-            if dev_ucorr_nopunc < dev_ucorrect_nopunc - 10:
+            if dev_ucorr_nopunc * 100 / dev_total_nopunc < dev_ucorrect_nopunc * 100 / dev_total_nopunc - 5:
                 # crashed due to adam, increase epsilon
                 network.load_state_dict(torch.load(param_name))
                 opt_state = torch.load(opt_name)
