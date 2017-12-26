@@ -514,7 +514,7 @@ def main():
             else:
                 network.load_state_dict(torch.load(param_name))
                 lr = lr * decay_rate
-                # eps = epsilon
+                eps = epsilon
 
                 # update optimizer
                 opt_state = torch.load(opt_name)
