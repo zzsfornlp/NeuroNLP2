@@ -502,10 +502,11 @@ def main():
             if dev_ucorr_nopunc * 100 / dev_total_nopunc < dev_ucorrect_nopunc * 100 / dev_total_nopunc - 5:
                 # crashed due to adam, increase epsilon
                 network.load_state_dict(torch.load(param_name))
-                opt_state = torch.load(opt_name)
                 eps = eps * 10
-                optim.load_state_dict(update_optim_state(opt_state, dict(eps=eps)))
-                logger.info('Optimizer crashed. Increase eps and roll model back to epoch %d' % best_epoch)
+                optim = generate_optimizer(opt, lr, network.parameters())
+                # opt_state = torch.load(opt_name)
+                # optim.load_state_dict(update_optim_state(opt_state, dict(eps=eps)))
+                logger.info('Optimizer crashed. Clear state, increase eps and roll model back to epoch %d' % best_epoch)
                 logger.info(get_opt_info(opt))
                 patient = 0
             elif patient < schedule:
@@ -513,7 +514,7 @@ def main():
             else:
                 network.load_state_dict(torch.load(param_name))
                 lr = lr * decay_rate
-                eps = epsilon
+                # eps = epsilon
 
                 # update optimizer
                 opt_state = torch.load(opt_name)
