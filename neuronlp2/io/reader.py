@@ -8,7 +8,7 @@ from . import utils
 
 class CoNLLXReader(object):
     def __init__(self, file_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet):
-        self.__source_file = open(file_path, 'r')
+        self.__source_file = open(file_path, 'r', encoding="utf-8")
         self.__word_alphabet = word_alphabet
         self.__char_alphabet = char_alphabet
         self.__pos_alphabet = pos_alphabet
@@ -28,7 +28,7 @@ class CoNLLXReader(object):
         lines = []
         while len(line.strip()) > 0:
             line = line.strip()
-            line = line.decode('utf-8')
+            # line = line.decode('utf-8')
             lines.append(line.split('\t'))
             line = self.__source_file.readline()
 
@@ -69,8 +69,8 @@ class CoNLLXReader(object):
             char_seqs.append(chars)
             char_id_seqs.append(char_ids)
 
-            word = utils.DIGIT_RE.sub(b"0", tokens[1]) if normalize_digits else tokens[1]
-            pos = tokens[4]
+            word = utils.DIGIT_RE.sub("0", tokens[1]) if normalize_digits else tokens[1]
+            pos = tokens[3]
             head = int(tokens[6])
             type = tokens[7]
 

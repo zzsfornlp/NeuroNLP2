@@ -8,7 +8,7 @@ import os
 from .logger import get_logger
 
 class Alphabet(object):
-    def __init__(self, name, defualt_value=False, keep_growing=True, singleton=False):
+    def __init__(self, name, defualt_value=True, keep_growing=True, singleton=False):
         self.__name = name
 
         self.instance2index = {}
@@ -121,7 +121,7 @@ class Alphabet(object):
                 os.makedirs(output_directory)
 
             json.dump(self.get_content(),
-                      open(os.path.join(output_directory, saving_name + ".json"), 'w'), indent=4)
+                      open(os.path.join(output_directory, saving_name + ".json"), 'w', encoding="utf-8"), indent=4)
         except Exception as e:
             self.logger.warn("Alphabet is not saved: %s" % repr(e))
 
@@ -133,6 +133,6 @@ class Alphabet(object):
         :return:
         """
         loading_name = name if name else self.__name
-        self.__from_json(json.load(open(os.path.join(input_directory, loading_name + ".json"))))
+        self.__from_json(json.load(open(os.path.join(input_directory, loading_name + ".json"), encoding="utf-8")))
         self.next_index = len(self.instances) + self.offset
         self.keep_growing = False

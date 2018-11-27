@@ -429,7 +429,7 @@ def stackptr(model_path, model_name, test_path, punct_set, use_gpu, logger, args
                     pred_display[2] = pred_stacked_heads.data[0].cpu().numpy()[:length_dec]
                     print(pred_display)
                     print('========================================================')
-                    raw_input()
+                    # raw_input()
 
                 if ucorr_stack == num_stack:
                     type_err += 1

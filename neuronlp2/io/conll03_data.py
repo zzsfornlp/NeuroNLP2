@@ -1,5 +1,7 @@
 __author__ = 'max'
 
+# todo(warn): did not change/update this file since use conllx_data for POS
+
 import os.path
 import random
 import numpy as np

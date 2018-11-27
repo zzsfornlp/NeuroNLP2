@@ -7,21 +7,21 @@ from .alphabet import Alphabet
 from .logger import get_logger
 from . import utils
 import torch
-from torch.autograd import Variable
+# from torch.autograd import Variable
 
 # Special vocabulary symbols - we always put them at the start.
-PAD = b"_PAD"
-PAD_POS = b"_PAD_POS"
-PAD_TYPE = b"_<PAD>"
-PAD_CHAR = b"_PAD_CHAR"
-ROOT = b"_ROOT"
-ROOT_POS = b"_ROOT_POS"
-ROOT_TYPE = b"_<ROOT>"
-ROOT_CHAR = b"_ROOT_CHAR"
-END = b"_END"
-END_POS = b"_END_POS"
-END_TYPE = b"_<END>"
-END_CHAR = b"_END_CHAR"
+PAD = "_PAD"
+PAD_POS = "_PAD_POS"
+PAD_TYPE = "_<PAD>"
+PAD_CHAR = "_PAD_CHAR"
+ROOT = "_ROOT"
+ROOT_POS = "_ROOT_POS"
+ROOT_TYPE = "_<ROOT>"
+ROOT_CHAR = "_ROOT_CHAR"
+END = "_END"
+END_POS = "_END_POS"
+END_TYPE = "_<END>"
+END_CHAR = "_END_CHAR"
 _START_VOCAB = [PAD, ROOT, END]
 
 UNK_ID = 0
@@ -31,20 +31,20 @@ PAD_ID_TAG = 0
 
 NUM_SYMBOLIC_TAGS = 3
 
-_buckets = [10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 140]
+_buckets = [10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 140, 1000]
 
 from .reader import CoNLLXReader
 
 
-def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabulary_size=50000, embedd_dict=None,
+def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabulary_size=500000, embedd_dict=None,
                      min_occurence=1, normalize_digits=True):
     def expand_vocab():
         vocab_set = set(vocab_list)
         for data_path in data_paths:
             # logger.info("Processing data: %s" % data_path)
-            with open(data_path, 'r') as file:
+            with open(data_path, 'r', encoding="utf-8") as file:
                 for line in file:
-                    line = line.decode('utf-8')
+                    # line = line.decode('utf-8')
                     line = line.strip()
                     if len(line) == 0:
                         continue
@@ -53,8 +53,8 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
                     for char in tokens[1]:
                         char_alphabet.add(char)
 
-                    word = utils.DIGIT_RE.sub(b"0", tokens[1]) if normalize_digits else tokens[1]
-                    pos = tokens[4]
+                    word = utils.DIGIT_RE.sub("0", tokens[1]) if normalize_digits else tokens[1]
+                    pos = tokens[3]
                     type = tokens[7]
 
                     pos_alphabet.add(pos)
@@ -85,9 +85,9 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
         type_alphabet.add(END_TYPE)
 
         vocab = dict()
-        with open(train_path, 'r') as file:
+        with open(train_path, 'r', encoding="utf-8") as file:
             for line in file:
-                line = line.decode('utf-8')
+                # line = line.decode('utf-8')
                 line = line.strip()
                 if len(line) == 0:
                     continue
@@ -96,8 +96,8 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
                 for char in tokens[1]:
                     char_alphabet.add(char)
 
-                word = utils.DIGIT_RE.sub(b"0", tokens[1]) if normalize_digits else tokens[1]
-                pos = tokens[4]
+                word = utils.DIGIT_RE.sub("0", tokens[1]) if normalize_digits else tokens[1]
+                pos = tokens[3]
                 type = tokens[7]
 
                 pos_alphabet.add(pos)
@@ -132,6 +132,14 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
             word_alphabet.add(word)
             if word in singletons:
                 word_alphabet.add_singleton(word_alphabet.get_index(word))
+
+        # =====
+        # todo(warn): add all words in embedding for later prediction
+        if embedd_dict is not None:
+            for word in embedd_dict.vocab:  # gensim.models.keyedvectors.Word2VecKeyedVectors
+                word_alphabet.add(word)
+                word_alphabet.add_singleton(word_alphabet.get_index(word))
+        # =====
 
         word_alphabet.save(alphabet_directory)
         char_alphabet.save(alphabet_directory)
@@ -368,13 +376,13 @@ def read_data_to_variable(source_path, word_alphabet, char_alphabet, pos_alphabe
                 if word_alphabet.is_singleton(wid):
                     single[i, j] = 1
 
-        words = Variable(torch.from_numpy(wid_inputs), volatile=volatile)
-        chars = Variable(torch.from_numpy(cid_inputs), volatile=volatile)
-        pos = Variable(torch.from_numpy(pid_inputs), volatile=volatile)
-        heads = Variable(torch.from_numpy(hid_inputs), volatile=volatile)
-        types = Variable(torch.from_numpy(tid_inputs), volatile=volatile)
-        masks = Variable(torch.from_numpy(masks), volatile=volatile)
-        single = Variable(torch.from_numpy(single), volatile=volatile)
+        words = torch.from_numpy(wid_inputs)
+        chars = torch.from_numpy(cid_inputs)
+        pos = torch.from_numpy(pid_inputs)
+        heads = torch.from_numpy(hid_inputs)
+        types = torch.from_numpy(tid_inputs)
+        masks = torch.from_numpy(masks)
+        single = torch.from_numpy(single)
         lengths = torch.from_numpy(lengths)
         if use_gpu:
             words = words.cuda()
@@ -414,8 +422,8 @@ def get_batch_variable(data, batch_size, unk_replace=0.):
 
     words = words[index]
     if unk_replace:
-        ones = Variable(single.data.new(batch_size, bucket_length).fill_(1))
-        noise = Variable(masks.data.new(batch_size, bucket_length).bernoulli_(unk_replace).long())
+        ones = single.data.new(batch_size, bucket_length).fill_(1)
+        noise = masks.data.new(batch_size, bucket_length).bernoulli_(unk_replace).long()
         words = words * (ones - single[index] * noise)
 
     return words, chars[index], pos[index], heads[index], types[index], masks[index], lengths[index]
@@ -436,8 +444,8 @@ def iterate_batch_variable(data, batch_size, unk_replace=0., shuffle=False):
 
         words, chars, pos, heads, types, masks, single, lengths = data_variable[bucket_id]
         if unk_replace:
-            ones = Variable(single.data.new(bucket_size, bucket_length).fill_(1))
-            noise = Variable(masks.data.new(bucket_size, bucket_length).bernoulli_(unk_replace).long())
+            ones = single.data.new(bucket_size, bucket_length).fill_(1)
+            noise = masks.data.new(bucket_size, bucket_length).bernoulli_(unk_replace).long()
             words = words * (ones - single * noise)
 
         indices = None
