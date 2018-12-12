@@ -163,11 +163,12 @@ def create_alphabets(alphabet_directory, train_path, data_paths=None, max_vocabu
 
 
 def read_data(source_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet, max_size=None,
-              normalize_digits=True, symbolic_root=False, symbolic_end=False):
+              normalize_digits=True, symbolic_root=False, symbolic_end=False, max_length=10000):
     data = [[] for _ in _buckets]
     max_char_length = [0 for _ in _buckets]
     print('Reading data from %s' % source_path)
     counter = 0
+    counter_used = 0
     reader = CoNLLXReader(source_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
     inst = reader.getNext(normalize_digits=normalize_digits, symbolic_root=symbolic_root, symbolic_end=symbolic_end)
     while inst is not None and (not max_size or counter < max_size):
@@ -177,17 +178,19 @@ def read_data(source_path, word_alphabet, char_alphabet, pos_alphabet, type_alph
 
         inst_size = inst.length()
         sent = inst.sentence
-        for bucket_id, bucket_size in enumerate(_buckets):
-            if inst_size < bucket_size:
-                data[bucket_id].append([sent.word_ids, sent.char_id_seqs, inst.pos_ids, inst.heads, inst.type_ids])
-                max_len = max([len(char_seq) for char_seq in sent.char_seqs])
-                if max_char_length[bucket_id] < max_len:
-                    max_char_length[bucket_id] = max_len
-                break
+        if inst_size <= max_length:     # filter by max-length
+            counter_used += 1
+            for bucket_id, bucket_size in enumerate(_buckets):
+                if inst_size < bucket_size:
+                    data[bucket_id].append([sent.word_ids, sent.char_id_seqs, inst.pos_ids, inst.heads, inst.type_ids])
+                    max_len = max([len(char_seq) for char_seq in sent.char_seqs])
+                    if max_char_length[bucket_id] < max_len:
+                        max_char_length[bucket_id] = max_len
+                    break
 
         inst = reader.getNext(normalize_digits=normalize_digits, symbolic_root=symbolic_root, symbolic_end=symbolic_end)
     reader.close()
-    print("Total number of data: %d" % counter)
+    print("Total number of data: %d(%d)" % (counter, counter_used))
     return data, max_char_length
 
 
@@ -323,10 +326,10 @@ def iterate_batch(data, batch_size, word_alphabet=None, unk_replace=0., shuffle=
 
 def read_data_to_variable(source_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet, max_size=None,
                           normalize_digits=True, symbolic_root=False, symbolic_end=False,
-                          use_gpu=False, volatile=False):
+                          use_gpu=False, volatile=False, max_length=10000):
     data, max_char_length = read_data(source_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
                                       max_size=max_size, normalize_digits=normalize_digits,
-                                      symbolic_root=symbolic_root, symbolic_end=symbolic_end)
+                                      symbolic_root=symbolic_root, symbolic_end=symbolic_end, max_length=max_length)
     bucket_sizes = [len(data[b]) for b in range(len(_buckets))]
 
     data_variable = []

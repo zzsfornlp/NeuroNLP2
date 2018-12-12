@@ -136,3 +136,6 @@ class Alphabet(object):
         self.__from_json(json.load(open(os.path.join(input_directory, loading_name + ".json"), encoding="utf-8")))
         self.next_index = len(self.instances) + self.offset
         self.keep_growing = False
+
+    def __eq__(self, other):
+        return self.instance2index == other.instance2index

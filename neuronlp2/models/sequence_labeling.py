@@ -135,6 +135,23 @@ class BiRecurrentConv(nn.Module):
             return self.nll_loss(self.logsoftmax(output), target.view(-1)).sum() / num, \
                    (torch.eq(preds, target).type_as(output)).sum(), preds
 
+    #
+    TORCH_MAX = lambda x, k, dim: torch.max(x, dim=dim, keepdim=True)
+    TORCH_TOPK = torch.topk
+
+    # todo(warn): does not filter outputs for masks
+    def predict(self, input_word, input_char, mask=None, length=None, hx=None, leading_symbolic=0, topk=1):
+        TOPK_F = BiRecurrentConv.TORCH_TOPK if topk>1 else BiRecurrentConv.TORCH_MAX
+        #
+        # [batch, length, tag_space]
+        output, mask, length = self.forward(input_word, input_char, mask=mask, length=length, hx=hx)
+        # [batch, length, num_labels]
+        output = self.dense_softmax(output)
+        probs = F.softmax(output, dim=-1)
+        #
+        topk_probs, topk_preds = TOPK_F(probs[:, :, leading_symbolic:], k=topk, dim=2)
+        topk_preds += leading_symbolic
+        return topk_probs, topk_preds
 
 class BiVarRecurrentConv(BiRecurrentConv):
     def __init__(self, word_dim, num_words, char_dim, num_chars, num_filters, kernel_size, rnn_mode, hidden_size, num_layers, num_labels,

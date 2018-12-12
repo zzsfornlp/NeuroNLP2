@@ -10,6 +10,7 @@ Implementation of Bi-directional LSTM-CNNs model for POS tagging.
 
 import sys
 import os
+import json
 
 sys.path.append(".")
 sys.path.append("..")
@@ -132,13 +133,24 @@ def main():
     window = 3
     num_layers = args.num_layers
     tag_space = args.tag_space
-    initializer = nn.init.xavier_uniform
+    initializer = nn.init.xavier_uniform_
     if args.dropout == 'std':
         network = BiRecurrentConv(embedd_dim, word_alphabet.size(), char_dim, char_alphabet.size(), num_filters, window, mode, hidden_size, num_layers, num_labels, tag_space=tag_space, embedd_word=word_table,  p_in=p_in, p_out=p_out, p_rnn=p_rnn, initializer=initializer)
     else:
         network = BiVarRecurrentConv(embedd_dim, word_alphabet.size(), char_dim, char_alphabet.size(), num_filters, window, mode, hidden_size, num_layers, num_labels, tag_space=tag_space, embedd_word=word_table, p_in=p_in, p_out=p_out, p_rnn=p_rnn, initializer=initializer)
     if use_gpu:
         network.cuda()
+
+    #
+    def save_args():
+        arg_path = model_name + '.arg.json'
+        arguments = [embedd_dim, word_alphabet.size(), char_dim, char_alphabet.size(), num_filters, window, mode, hidden_size, num_layers, num_labels]
+        kwargs = {'tag_space': tag_space, 'p_in': p_in, 'p_out': p_out, 'p_rnn': p_rnn}
+        json.dump({'args': arguments, 'kwargs': kwargs}, open(arg_path, 'w'), indent=4)
+
+    save_args()
+    # # tmp
+    # raise "stop for building args"
 
     lr = learning_rate
     # optim = Adam(network.parameters(), lr=lr, betas=(0.9, 0.9), weight_decay=gamma)

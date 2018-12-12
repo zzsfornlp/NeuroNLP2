@@ -15,9 +15,9 @@ CUDA_VISIBLE_DEVICES=$RGPU PYTHONPATH=${SRC_DIR} python3 ${SRC_DIR}/examples3/tr
 --char_embedding random \
 --punctuation '.' '``' "''" ':' ',' 'PUNCT' 'SYM' \
 --model_path "models/" --model_name 'network.pt' \
---word_embedding word2vec --word_path "../data/ud22/zwiki.${CUR_LANG}.vec" \
---train "../data/ud22/${CUR_LANG}_train.conllu" \
---dev "../data/ud22/${CUR_LANG}_dev.conllu" \
---test "../data/ud22/${CUR_LANG}_test.conllu"
+--word_embedding word2vec --word_path "../data/ud23/zwiki.${CUR_LANG}.vec" \
+--train "../data/ud23/${CUR_LANG}_train.conllu" \
+--dev "../data/ud23/${CUR_LANG}_dev.conllu" \
+--test "../data/ud23/${CUR_LANG}_test.conllu"
 
 # RGPU= CUR_LANG=en bash ../src/examples3/train/train_parser.sh |& tee log

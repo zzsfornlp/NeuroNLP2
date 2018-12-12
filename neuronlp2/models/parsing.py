@@ -274,6 +274,69 @@ class BiRecurrentConvBiAffine(nn.Module):
 
         return parser.decode_MST(energy.data.cpu().numpy(), length, leading_symbolic=leading_symbolic, labeled=True)
 
+    #
+    TORCH_MAX = lambda x, k, dim: torch.max(x, dim=dim, keepdim=True)
+    TORCH_TOPK = torch.topk
+
+    # todo(warn): topk is only for greedy-decode, MST still return the best
+    def predict(self, input_word, input_char, input_pos, mask=None, length=None, hx=None, leading_symbolic=0, greedy_topk=1, mst=0):
+        # TODO(+2): what if topk>max_len, although not used in practice
+        TOPK_F = BiRecurrentConvBiAffine.TORCH_TOPK if greedy_topk>1 else BiRecurrentConvBiAffine.TORCH_MAX
+        #
+        # out_arc shape [batch, length, length]
+        out_arc, out_type, mask, length = self.forward(input_word, input_char, input_pos, mask=mask, length=length, hx=hx)
+        # -- put mask
+        batch, max_len, _ = out_arc.size()
+        MINUS_INF = -1e8
+        out_arc = out_arc + torch.diag(out_arc.new(max_len).fill_(MINUS_INF))
+        if mask is not None:
+            minus_mask = (1 - mask) * MINUS_INF
+            out_arc = out_arc + minus_mask.unsqueeze(2) + minus_mask.unsqueeze(1)
+        #
+        # greedy: [batch, topk, length]
+        out_arc_probs = F.softmax(out_arc, dim=1)
+        head_probs, heads = TOPK_F(out_arc_probs, k=greedy_topk, dim=1)
+        #
+        # mst & types
+        if mst:
+            # --- MST decoding
+            # full calculations for type
+            # out_type shape [batch, length, type_space]
+            type_h, type_c = out_type
+            batch, max_len, type_space = type_h.size()
+            type_h = type_h.unsqueeze(2).expand(batch, max_len, max_len, type_space).contiguous()
+            type_c = type_c.unsqueeze(1).expand(batch, max_len, max_len, type_space).contiguous()
+            # compute output for type [batch, length, length, num_labels]
+            out_type = self.bilinear(type_h, type_c)
+            # loss_arc shape [batch, length, length]
+            loss_arc = F.log_softmax(out_arc, dim=1)
+            # loss_type shape [batch, length, length, num_labels]
+            loss_type = F.log_softmax(out_type, dim=3).permute(0, 3, 1, 2)
+            # [batch, num_labels, length, length]
+            energy = torch.exp(loss_arc.unsqueeze(1) + loss_type)
+            arr_mst_heads, arr_mst_types = parser.decode_MST(energy.cpu().numpy(), length, leading_symbolic=leading_symbolic, labeled=True)
+            #
+            # types [batch, topk, length, num_labels]
+            out_type_selected = out_type.gather(dim=1, index=heads.unsqueeze(-1).expand(batch, greedy_topk, max_len, self.num_labels))
+        else:
+            arr_mst_heads, arr_mst_types = None, None
+            #
+            # out_type shape [batch, length, type_space]
+            type_h, type_c = out_type
+            batch, max_len, type_space = type_h.size()
+            # [batch, topk, length, size]
+            type_h = type_h.unsqueeze(2).expand(batch, max_len, max_len, type_space).gather(dim=1, index=heads.unsqueeze(-1).expand(batch, greedy_topk, max_len, type_space))
+            # compute output for type [batch, topk, length, num_labels]
+            out_type_selected = self.bilinear(type_h, type_c.unsqueeze(1).expand(batch, greedy_topk, max_len, type_space).contiguous())
+        # -- types
+        # remove the first #leading_symbolic types.
+        out_type_probs = F.softmax(out_type_selected[:, :, :, leading_symbolic:], dim=-1)
+        # compute the prediction of types [batch, s-topk, length]
+        type_probs, types = TOPK_F(out_type_probs, k=greedy_topk, dim=-1)
+        types += leading_symbolic
+        # [batch, length], [batch, length, topk], [batch, length, topk, topk]
+        return arr_mst_heads, arr_mst_types, heads.transpose(1,2), head_probs.transpose(1,2), \
+               types.transpose(1,2), type_probs.transpose(1,2)
 
 class StackPtrNet(nn.Module):
     def __init__(self, word_dim, num_words, char_dim, num_chars, pos_dim, num_pos, num_filters, kernel_size,

@@ -72,6 +72,9 @@ def main():
     args_parser.add_argument('--test')  # "data/POS-penn/wsj/split1/wsj1.test.original"
     args_parser.add_argument('--model_path', help='path for saving model file.', required=True)
     args_parser.add_argument('--model_name', help='name for saving model file.', required=True)
+    #
+    args_parser.add_argument('--train_max_length', type=int, default=100)
+    args_parser.add_argument('--test_max_length', type=int, default=150)
 
     args = args_parser.parse_args()
 
@@ -141,13 +144,13 @@ def main():
     logger.info("Reading Data")
     use_gpu = torch.cuda.is_available()
 
-    data_train = conllx_data.read_data_to_variable(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet, use_gpu=use_gpu, symbolic_root=True)
+    data_train = conllx_data.read_data_to_variable(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet, use_gpu=use_gpu, symbolic_root=True, max_length=args.train_max_length)
     # data_train = conllx_data.read_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
     # num_data = sum([len(bucket) for bucket in data_train])
     num_data = sum(data_train[1])
 
-    data_dev = conllx_data.read_data_to_variable(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet, use_gpu=use_gpu, volatile=True, symbolic_root=True)
-    data_test = conllx_data.read_data_to_variable(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet, use_gpu=use_gpu, volatile=True, symbolic_root=True)
+    data_dev = conllx_data.read_data_to_variable(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet, use_gpu=use_gpu, volatile=True, symbolic_root=True, max_length=args.test_max_length)
+    data_test = conllx_data.read_data_to_variable(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet, use_gpu=use_gpu, volatile=True, symbolic_root=True, max_length=args.test_max_length)
 
     punct_set = None
     if punctuation is not None:
