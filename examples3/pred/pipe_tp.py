@@ -78,6 +78,8 @@ class DataStreamer:
     # yield (List-instances [str], Torch-Data)
     # todo(warn): out of order!
     def stream(self, fin):
+        cur_sent_id = 0
+        #
         bsize = self.batch_size
         last_report_sent = 0
         buffers = []
@@ -95,10 +97,11 @@ class DataStreamer:
                         add_entry(self.stats, "oovt_sent", 1)
                         add_entry(self.stats, "oovt_tok", tok_num)
                         add_entry(self.stats, "oovt_tok_invoc", invoc_num)
-                        buffers.append(tokens)
+                        buffers.append({"sid": cur_sent_id, "tokens": tokens})
+                cur_sent_id += 1
             # yield the ones in buffer?
             if len(buffers) >= self.K:
-                buffers.sort(key=len)
+                buffers.sort(key=lambda x: len(x["tokens"]))
                 sidx = 0
                 while sidx < len(buffers):
                     yield buffers[sidx:sidx+bsize]
@@ -164,12 +167,19 @@ def main():
     logger = get_logger("Predictor")
     if args.input is None:
         fin = sys.stdin
+        logger.info("Read from stdin!")
     else:
         fin = zopen(args.input)
+        logger.info("Read from input file %s" % args.input)
     if args.output is None:
         fout = sys.stdout
     else:
         fout = zopen(args.output, "w")
+
+    # detect gpu
+    if use_gpu and not torch.cuda.is_available():
+        use_gpu = False
+        logger.info("No cuda detected, use cpu instead!!")
 
     # load tagger
     logger.info("Loading models!")
@@ -209,7 +219,9 @@ def main():
     ROOT_CIDX = char_alphabet.get_index(ROOT_CHAR)
     with torch.no_grad():
         streamer = DataStreamer(args, word_alphabet.instance2index, logger)
-        for instances in streamer.stream(fin):      # List of [tok]
+        for inst_dicts in streamer.stream(fin):      # List of [tok]
+            # tokens
+            instances = [z["tokens"] for z in inst_dicts]
             # prepare for tagger/parser
             max_word_length = max(len(z)+1 for z in instances)      # +1 for sym-ROOT
             max_char_length = min(utils.MAX_CHAR_LENGTH, max(len(w) for z in instances for w in z)+utils.NUM_CHAR_PAD)
@@ -250,16 +262,16 @@ def main():
             if use_gpu:
                 t_tag = t_tag.cuda()
             #
-            arr_mst_heads, arr_mst_types, heads, head_probs, types, type_probs = parser_model.predict(t_word, t_char, t_tag, mask=t_mask, length=t_length, leading_symbolic=conllx_data.NUM_SYMBOLIC_TAGS, greedy_topk=parser_topk, mst=parser_mst)
+            arr_mst_heads, arr_mst_types, arr_mst_probs, heads, head_probs, types, type_probs = parser_model.predict(t_word, t_char, t_tag, mask=t_mask, length=t_length, leading_symbolic=conllx_data.NUM_SYMBOLIC_TAGS, greedy_topk=parser_topk, mst=parser_mst)
             # =====
             # output
             arr_tag_probs, arr_tags = topk_t_probs.cpu().numpy(), topk_t_preds.cpu().numpy()
             arr_heads, arr_head_probs, arr_types, arr_type_probs = [z.cpu().numpy() for z in (heads, head_probs, types, type_probs)]
             #
             FLOAT_DIGITS = 4
-            for b, inst in enumerate(instances):
-                inst_size = len(inst) + 1
-                ret = {"tokens": inst}
+            for b, inst_d in enumerate(inst_dicts):
+                inst_size = len(inst_d["tokens"]) + 1
+                ret = {"tokens": inst_d["tokens"], "sid": inst_d["sid"]}
                 ret["tags"] = [[pos_alphabet.get_instance(z1) for z1 in z0] for z0 in arr_tags[b][:inst_size-1]]
                 ret["tag_probs"] = [[format_float(z1, FLOAT_DIGITS) for z1 in z0] for z0 in arr_tag_probs[b][:inst_size-1]]
                 ret["heads"] = [[int(z1) for z1 in z0] for z0 in arr_heads[b][1:inst_size]]
@@ -270,9 +282,11 @@ def main():
                     # only one prediction
                     ret["mst_heads"] = [int(z) for z in arr_mst_heads[b][1:inst_size]]
                     ret["mst_types"] = [type_alphabet.get_instance(z) for z in arr_mst_types[b][1:inst_size]]
+                    ret["mst_probs"] = [format_float(z, FLOAT_DIGITS) for z in arr_mst_probs[b][1:inst_size]]
                 else:
                     ret["mst_heads"] = None
                     ret["mst_types"] = None
+                    ret["mst_probs"] = None
                 # check length
                 for z in ret:
                     if isinstance(ret[z], list):

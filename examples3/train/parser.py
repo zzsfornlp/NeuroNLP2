@@ -160,7 +160,8 @@ def main():
     def construct_word_embedding_table():
         scale = np.sqrt(3.0 / word_dim)
         table = np.empty([word_alphabet.size(), word_dim], dtype=np.float32)
-        table[conllx_data.UNK_ID, :] = np.zeros([1, word_dim]).astype(np.float32) if freeze else np.random.uniform(-scale, scale, [1, word_dim]).astype(np.float32)
+        # table[conllx_data.UNK_ID, :] = np.zeros([1, word_dim]).astype(np.float32) if freeze else np.random.uniform(-scale, scale, [1, word_dim]).astype(np.float32)
+        table[conllx_data.UNK_ID, :] = np.random.uniform(-scale, scale, [1, word_dim]).astype(np.float32)
         oov = 0
         for word, index in word_alphabet.items():
             if word in word_dict:
@@ -168,7 +169,8 @@ def main():
             elif word.lower() in word_dict:
                 embedding = word_dict[word.lower()]
             else:
-                embedding = np.zeros([1, word_dim]).astype(np.float32) if freeze else np.random.uniform(-scale, scale, [1, word_dim]).astype(np.float32)
+                # embedding = np.zeros([1, word_dim]).astype(np.float32) if freeze else np.random.uniform(-scale, scale, [1, word_dim]).astype(np.float32)
+                embedding = np.random.uniform(-scale, scale, [1, word_dim]).astype(np.float32)
                 oov += 1
             table[index, :] = embedding
         print('word OOV: %d' % oov)

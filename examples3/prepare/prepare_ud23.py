@@ -2,24 +2,25 @@
 
 # prepare data and embeddings
 
-# for cur_lang in cs de en fr "fi" it ja zh; do
+# for cur_lang in en de fr es it cs "fi" ru ja zh; do
 
 #print("\n".join([z[1][0].split("-")[0].split("_")[1] for z in x]))
 LANGUAGE_LIST = (
-    # init group, I think at most these for this project
-    ["cs", ["UD_Czech-PDT", "UD_Czech-CAC", "UD_Czech-CLTT", "UD_Czech-FicTree"], "IE.Slavic.West"],
-    ["de", ["UD_German-GSD"], "IE.Germanic.West"],
     ["en", ["UD_English-EWT", "UD_English-ParTUT", "UD_English-GUM"], "IE.Germanic.West"],
+    ["de", ["UD_German-GSD"], "IE.Germanic.West"],
     ["fr", ["UD_French-GSD", "UD_French-ParTUT", "UD_French-Sequoia"], "IE.Romance.West"],
-    ["fi", ["UD_Finnish-TDT"], "Uralic.Finnic"],
+    ["es", ["UD_Spanish-GSD", "UD_Spanish-AnCora"], "IE.Romance.West"],
     ["it", ["UD_Italian-ISDT", "UD_Italian-ParTUT"], "IE.Romance.Italo"],
+    ["cs", ["UD_Czech-PDT", "UD_Czech-CAC", "UD_Czech-CLTT", "UD_Czech-FicTree"], "IE.Slavic.West"],
+    ["fi", ["UD_Finnish-TDT"], "Uralic.Finnic"],
+    ["ru", ["UD_Russian-GSD", "UD_Russian-SynTagRus"], "IE.Slavic.East"],
     ["ja", ["UD_Japanese-GSD"], "Japanese"],
     ["zh", ["UD_Chinese-GSD"], "Sino-Tibetan"],
 )
 
 NAME_MAP = {
-    "cs": "Czech", "de": "German", "en": "English", "fr": "French",
-    "fi": "Finnish", "it": "Italian", "ja": "Japanese", "zh": "Chinese",
+    "cs": "Czech", "de": "German", "en": "English", "fr": "French", "es": "Spanish",
+    "fi": "Finnish", "it": "Italian", "ru": "Russian", "ja": "Japanese", "zh": "Chinese",
 }
 
 # confs (make sure to set up the dir correctly)
@@ -104,12 +105,12 @@ def main():
 #
 # from fasttext import FastVector
 #
-# def main2():
-#     for zzz in LANGUAGE_LIST:
-#         lang = zzz[0]
-#         # get original embed
-#         system("wget -nc -O %s/wiki.%s.vec https://s3-us-west-1.amazonaws.com/fasttext-vectors/wiki.%s.vec" % (OUT_DIR, lang, lang), pp=True)
-#         # project with LIB-matrix
+def main2():
+    for zzz in LANGUAGE_LIST:
+        lang = zzz[0]
+        # get original embed
+        system("wget -nc -O %s/wiki.%s.vec https://s3-us-west-1.amazonaws.com/fasttext-vectors/wiki.%s.vec" % (OUT_DIR, lang, lang), pp=True)
+        # project with LIB-matrix
 #         lang_dict = FastVector(vector_file='%s/wiki.%s.vec' % (OUT_DIR, lang))
 #         lang_dict.apply_transform("%s/alignment_matrices/%s.txt" % (LIB_DIR, lang))
 #         lang_dict.export("%s/wiki.multi.%s.vec" % (OUT_DIR, lang))
@@ -117,7 +118,7 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # main2()
+    main2()
 
 # The prepared files are: OUT_DIR/{*_*.conllu, wiki.multi.*.vec}
 # python3 prepare_ud23.py |& grep -v "s$" | tee ud23/log_cu

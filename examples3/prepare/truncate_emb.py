@@ -19,15 +19,15 @@ def main(fin, fout, max_num):
         fout.write(line)
 
 if __name__ == '__main__':
-    MAX_NUM = 500000
+    MAX_NUM = 400000
     main(sys.stdin, sys.stdout, MAX_NUM)
 
 #
 """
 # for lang in ar bg ca zh hr cs da nl en et "fi" fr de he hi id it ja ko la lv no pl pt ro ru sk sl es sv uk;
-for cur_lang in en cs "fi" fr it de zh ja;
+for cur_lang in "fi" en de fr es it cs ru ja zhs;
 do
 echo $cur_lang;
-python3 ../truncate_embed.py < embeds_orig/wiki.${cur_lang}.vec > zwiki.${cur_lang}.vec
+python3 ./truncate_embed.py < embeds_orig/wiki.${cur_lang}.vec > zwiki.${cur_lang}.vec
 done |& tee log_embed
 """

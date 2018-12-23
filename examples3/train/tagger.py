@@ -49,6 +49,7 @@ def main():
     parser.add_argument('--schedule', type=int, help='schedule for learning rate decay')
     parser.add_argument('--unk_replace', type=float, default=0., help='The rate to replace a singleton word with UNK')
     parser.add_argument('--word_embedding', choices=['word2vec', 'glove', 'senna', 'sskip', 'polyglot'], help='Embedding for words', required=True)
+    parser.add_argument('--freeze', action='store_true', help='frozen the word embedding (disable fine-tuning).')
     parser.add_argument('--word_path', help='path for embedding dict')
     parser.add_argument('--train')  # "data/POS-penn/wsj/split1/wsj1.train.original"
     parser.add_argument('--dev')  # "data/POS-penn/wsj/split1/wsj1.dev.original"
@@ -138,6 +139,10 @@ def main():
         network = BiRecurrentConv(embedd_dim, word_alphabet.size(), char_dim, char_alphabet.size(), num_filters, window, mode, hidden_size, num_layers, num_labels, tag_space=tag_space, embedd_word=word_table,  p_in=p_in, p_out=p_out, p_rnn=p_rnn, initializer=initializer)
     else:
         network = BiVarRecurrentConv(embedd_dim, word_alphabet.size(), char_dim, char_alphabet.size(), num_filters, window, mode, hidden_size, num_layers, num_labels, tag_space=tag_space, embedd_word=word_table, p_in=p_in, p_out=p_out, p_rnn=p_rnn, initializer=initializer)
+
+    if args.freeze:
+        network.word_embedd.freeze()
+
     if use_gpu:
         network.cuda()
 

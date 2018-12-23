@@ -16,7 +16,7 @@ PYTHONPATH=${SRC_DIR} python3 ${SRC_DIR}/examples3/train/tagger.py \
 --word_embedding word2vec --word_path "../data/ud23/zwiki.${CUR_LANG}.vec" \
 --train "../data/ud23/${CUR_LANG}_train.conllu" \
 --dev "../data/ud23/${CUR_LANG}_dev.conllu" \
---test "../data/ud23/${CUR_LANG}_test.conllu"
+--test "../data/ud23/${CUR_LANG}_test.conllu" --freeze
 
 # RGPU= CUR_LANG=en bash ../src/examples3/train/train_tagger.sh |& tee log
 

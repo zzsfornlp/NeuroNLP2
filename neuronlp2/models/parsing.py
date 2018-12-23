@@ -272,7 +272,8 @@ class BiRecurrentConvBiAffine(nn.Module):
         # [batch, num_labels, length, length]
         energy = torch.exp(loss_arc.unsqueeze(1) + loss_type)
 
-        return parser.decode_MST(energy.data.cpu().numpy(), length, leading_symbolic=leading_symbolic, labeled=True)
+        arr_mst_heads, arr_mst_types, _ = parser.decode_MST(energy.data.cpu().numpy(), length, leading_symbolic=leading_symbolic, labeled=True)
+        return arr_mst_heads, arr_mst_types
 
     #
     TORCH_MAX = lambda x, k, dim: torch.max(x, dim=dim, keepdim=True)
@@ -313,13 +314,15 @@ class BiRecurrentConvBiAffine(nn.Module):
             # loss_type shape [batch, length, length, num_labels]
             loss_type = F.log_softmax(out_type, dim=3).permute(0, 3, 1, 2)
             # [batch, num_labels, length, length]
-            energy = torch.exp(loss_arc.unsqueeze(1) + loss_type)
-            arr_mst_heads, arr_mst_types = parser.decode_MST(energy.cpu().numpy(), length, leading_symbolic=leading_symbolic, labeled=True)
+            # todo(!): energy should be in log-space since we are adding in decode_MST
+            # energy = torch.exp(loss_arc.unsqueeze(1) + loss_type)
+            energy = loss_arc.unsqueeze(1) + loss_type
+            arr_mst_heads, arr_mst_types, arr_mst_probs = parser.decode_MST(energy.cpu().numpy(), length, leading_symbolic=leading_symbolic, labeled=True)
             #
             # types [batch, topk, length, num_labels]
             out_type_selected = out_type.gather(dim=1, index=heads.unsqueeze(-1).expand(batch, greedy_topk, max_len, self.num_labels))
         else:
-            arr_mst_heads, arr_mst_types = None, None
+            arr_mst_heads, arr_mst_types, arr_mst_probs = None, None, None
             #
             # out_type shape [batch, length, type_space]
             type_h, type_c = out_type
@@ -335,7 +338,7 @@ class BiRecurrentConvBiAffine(nn.Module):
         type_probs, types = TOPK_F(out_type_probs, k=greedy_topk, dim=-1)
         types += leading_symbolic
         # [batch, length], [batch, length, topk], [batch, length, topk, topk]
-        return arr_mst_heads, arr_mst_types, heads.transpose(1,2), head_probs.transpose(1,2), \
+        return arr_mst_heads, arr_mst_types, arr_mst_probs, heads.transpose(1,2), head_probs.transpose(1,2), \
                types.transpose(1,2), type_probs.transpose(1,2)
 
 class StackPtrNet(nn.Module):

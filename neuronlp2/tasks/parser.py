@@ -41,10 +41,10 @@ def eval(words, postags, heads_pred, types_pred, heads, types, word_alphabet, po
         lcm_nopunc = 1.
         for j in range(start, lengths[i] - end):
             word = word_alphabet.get_instance(words[i, j])
-            word = word.encode('utf8')
+            # word = word.encode('utf8')
 
             pos = pos_alphabet.get_instance(postags[i, j])
-            pos = pos.encode('utf8')
+            # pos = pos.encode('utf8')
 
             total += 1
             if heads[i, j] == heads_pred[i, j]:
@@ -248,6 +248,8 @@ def decode_MST(energies, lengths, leading_symbolic=0, labeled=True):
 
     pars = np.zeros([batch_size, max_length], dtype=np.int32)
     types = np.zeros([batch_size, max_length], dtype=np.int32) if labeled else None
+    ret_logprobs = np.zeros([batch_size, max_length], dtype=np.float32)
+
     for i in range(batch_size):
         energy = energies[i]
 
@@ -274,8 +276,10 @@ def decode_MST(energies, lengths, leading_symbolic=0, labeled=True):
         reps = []
 
         for s in range(length):
-            orig_score_matrix[s, s] = 0.0
-            score_matrix[s, s] = 0.0
+            # orig_score_matrix[s, s] = 0.0
+            # score_matrix[s, s] = 0.0
+            orig_score_matrix[s, s] = -np.inf
+            score_matrix[s, s] = -np.inf
             curr_nodes[s] = True
             reps.append(set())
             reps[s].add(s)
@@ -289,6 +293,7 @@ def decode_MST(energies, lengths, leading_symbolic=0, labeled=True):
         final_edges = dict()
         chuLiuEdmonds()
         par = np.zeros([max_length], np.int32)
+        one_logprobs = np.zeros([max_length], np.float32) - np.inf
         if labeled:
             type = np.ones([max_length], np.int32)
             type[0] = 0
@@ -299,10 +304,12 @@ def decode_MST(energies, lengths, leading_symbolic=0, labeled=True):
             par[ch] = pr
             if labeled and ch != 0:
                 type[ch] = label_id_matrix[pr, ch]
+            one_logprobs[ch] = orig_score_matrix[pr, ch]
 
         par[0] = 0
         pars[i] = par
         if labeled:
             types[i] = type
+        ret_logprobs[i] = one_logprobs
 
-    return pars, types
+    return pars, types, np.exp(ret_logprobs)

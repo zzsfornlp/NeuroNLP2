@@ -65,6 +65,9 @@ def main(args):
     instances_map = {"".join(z["word"]):z for z in instances}
     for p in preds:
         key = "".join(p["tokens"])
+        if key not in instances_map:
+            print("!!Warn, sentence not found (maybe because of tokenization!)")
+            continue
         g = instances_map[key]
         for kk in ["tokens", "tags", "heads", "types", "mst_heads", "mst_types"]:
             assert len(g["word"]) == len(p[kk])
@@ -105,3 +108,4 @@ if __name__ == '__main__':
 
 # python3 -m pdb ../src/examples3/pred/test_pipe.py ../data/ud23/en_test.conllu ../zt_en/models/ ../zp_en/models/ 1
 # PYTHONPATH=../src/examples3/pred/../.. CUDA_VISIBLE_DEVICES=1 python3 ../src/examples3/pred/pipe_tp.py --input tmp.in --output tmp.out --tagger_path ../zt_en/models/ --tagger_name network.pt --parser_path ../zp_en/models/ --parser_name network.pt --len_thresh_min 0 --len_thresh_max 1000 --oov_thresh 1.0 --gpu --parser_mst 0 --parser_topk 1 --tagger_topk 1
+# python3 ../../../models/src/examples3/pred/test_pipe.py ../../ud23/de_test.conllu ../../../models/{zft_de,zp_de_nopos_freeze500}/models/  $CUDA_VISIBLE_DEVICES
